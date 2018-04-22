@@ -1,36 +1,8 @@
-
-Skip to content
-This repository
-
-    Pull requests
-    Issues
-    Marketplace
-    Explore
-
-    @Lingrui98
-
-1
-0
-
-    0
-
-Lingrui98/KTH-Assignment
-Code
-Issues 0
-Pull requests 0
-Projects 0
-Wiki
-Insights
-Settings
-KTH-Assignment/DLDS/A1.py
-726947b 21 seconds ago
-@Lingrui98 Lingrui98 Add files via upload
-198 lines (161 sloc) 6.78 KB
 import cPickle  
 import numpy as np  
 import os  
 
-batch_size = 100
+batch_size = 50
 eta = 0.01
 lamda = 0
 epoch = 40
@@ -65,23 +37,36 @@ class Classifier(object):
     
     def EvaluateClassifier(self, X, W, b):
         n = X.shape[1]
-        P = np.array([0.0 for i in xrange(n)] for j in xrange(self.out_size))
+        #print n
+        P = np.zeros((self.out_size,n))
+        #print P.shape
+        P = np.reshape(P,(self.out_size,n))
+        #print P.shape, P[:,1].shape
+        #print type(P[:,1])
         for i in xrange(n):
-            s = np.dot(W,X[:,i]) + b
+            s = np.dot(W,np.reshape(X[:,i],(self.in_size,1))) + b
+            #print s.shape
             p = self.softmax(s)
-            P[:,i] = p
+            #print p.shape
+            if i == 0:
+                P = p
+            else:
+                P = np.hstack([P,p])
+        #print P.shape
         return P
     
     def ComputeCost(self, X, Y, W, b, lambda_):
         n = X.shape[1]
         P = self.EvaluateClassifier(X, W, b)
-        L = np.hstack(np.dot(Y[:,i],P[i]) for i in xrange(n))
-        print "L = ", L
+        #print P[0].shape
+        L = np.hstack([np.dot(np.reshape(Y[:,i],(1,self.out_size)),np.reshape(P[:,i],(self.out_size,1))) for i in xrange(n)])
+        #print "L = ", L
         J = np.sum(L) + lambda_ * np.sum(np.square(W))
         return J
     
     def ComputeAccuracy(self, X, Y, W, b):
         n = X.shape[1]
+        #print Y.shape
         P = self.EvaluateClassifier(X, W, b)
         labels = np.array([np.argmax(Y[:,i]) for i in xrange(n)])
         out = np.array([np.argmax(P[:,i]) for i in xrange(n)])
@@ -89,47 +74,89 @@ class Classifier(object):
         for i in xrange(n):
             if labels[i]==out[i]:
                 num += 1.0
-        acc = num / n
+        acc = num / float(n)
         return acc
         
     def ComputeGradients(self, X, Y, P, W, lambda_):
         n = X.shape[1]
-        grad_W = np.array([0.0 for i in xrange(self.in_size)] for j in xrange(self.out_size))
+        #print X.shape, Y.shape
+        grad_W = np.zeros((self.out_size,self.in_size))
         grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
-        grad_b = np.array([0.0 for i in xrange(self.out_size)])
+        grad_b = np.zeros(self.out_size)
         grad_b = np.reshape(grad_b, (self.out_size,1))
         
         for i in xrange(n):
-            g = -(Y[:,i] - P[:,i]).T
+            g = -(np.reshape(Y[:,i],(self.out_size,1)) - np.reshape(P[:,i],(self.out_size,1)))
+            #print g.shape, grad_b.shape
             grad_b += g
-            grad_W += np.dot(g.T,X[:,i])
+            grad_W += np.dot(g,np.reshape(X[:,i],(1,self.in_size)))
         grad_W /= n
         grad_b /= n
         grad_W += 2 * lambda_ * W
+        #print grad_b
+        return grad_W, grad_b
+        
+    def ComputeGradsNum(self, X, Y, W, b, lamda, h):
+        grad_W = np.zeros((self.out_size,self.in_size))
+        grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
+        grad_b = np.zeros(self.out_size)
+        grad_b = np.reshape(grad_b, (self.out_size,1))
+        
+        c = self.ComputeCost(X,Y,W,b,lamda)
+        for i in xrange(self.out_size):
+            b_try = self.b.copy()
+            b_try[i] += h
+            c2 = self.ComputeCost(X,Y,W,b_try,lamda)
+            grad_b[i] = (c2-c) / h
+            
+        numel = self.in_size*self.out_size
+        for i in xrange(numel):
+            W_try = self.W.copy()
+            r = i // self.in_size
+            c = i % self.in_size
+            W_try[r][c] += h
+            c2 = self.ComputeCost(X, Y, W_try, b, lamda)
+            
+            grad_W[r][c] = (c2-c) / h
+        
         return grad_W, grad_b
         
     def Train(self, loss_type = CrossEntropy):
         ep = 0
         
         X_t, Y_t = self.reader.next_test_data()
-        X_t = np.reshape(np.array(X_t), (10000,3072)).T
-        Y_t = np.array(Y_t)        for ep in xrange(self.max_epoch):
+        #print np.array(X_t)[0]
+        X_t = np.reshape(np.array(X_t) / 256.0, (10000,3072)).T
+        #print X_t.shape
+        #print X_t[5]
+        #return
+        Y_t = np.array(Y_t).T        
+        for ep in xrange(self.max_epoch):
             print "Epoch %d, " % ep
             batch_index = 0
             for batch_index in xrange(50000//self.batch_size):
                 X, Y = self.reader.next_train_data(self.batch_size)
-                X = np.array(X) / 256
+                X = np.array(X) / 256.0
                 X = np.reshape(X,(self.batch_size,3072)).T
                 Y = np.array(Y).T
                 
                 P = self.EvaluateClassifier(X,self.W,self.b)
-                grad_W, grad_b = ComputeGradients(X,Y,P,self.W,self.lambda_)
+                grad_W, grad_b = self.ComputeGradients(X,Y,P,self.W,self.lambda_)
+                #gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
                 
-                J = ComputeCost(X,Y,self.W,self.b,self.lambda_)
-                print "Cost = %f in batch %d" % (J,batch_index)
+                #D_gW = grad_W - gWt
+                #D_gb = grad_b - gbt
+                #print grad_b,gbt,D_gb
+                #E_gW = np.mean(np.abs(D_gW))/np.mean(np.abs(gWt))
+                #E_gb = np.mean(np.abs(D_gb))/np.mean(np.abs(gbt))
                 
-                self.W += grad_W
-                self.b += grad_b
+                #print E_gW, E_gb
+                
+                J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
+                #print "Cost = %f in batch %d" % (J,batch_index)
+                
+                self.W += -self.learning_rate * grad_W
+                self.b += -self.learning_rate * grad_b
             acc = self.ComputeAccuracy(X_t,Y_t,self.W,self.b)
             print("Accuracy = %f%% after epoch %d" % (acc*100,ep))
             
@@ -212,3 +239,4 @@ if __name__=="__main__":
     c = Classifier(32*32*3,10,eta,lamda,epoch,reader=dr)
     # training and testing
     c.Train() 
+
