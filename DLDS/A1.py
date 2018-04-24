@@ -2,10 +2,10 @@ import cPickle
 import numpy as np  
 import os  
 
-batch_size = 50
+batch_size = 100
 eta = 0.01
 lamda = 0
-epoch = 40
+epoch = 10
 
 
 SVM = 0
@@ -132,33 +132,34 @@ class Classifier(object):
         #return
         Y_t = np.array(Y_t).T        
         for ep in xrange(self.max_epoch):
-            print "Epoch %d, " % ep
+            print "Epoch %d, " % (ep+1)
             batch_index = 0
             for batch_index in xrange(50000//self.batch_size):
                 X, Y = self.reader.next_train_data(self.batch_size)
-                X = np.array(X) / 256.0
-                X = np.reshape(X,(self.batch_size,3072)).T
+                X = np.array(X) 
+                X = np.reshape(X,(self.batch_size,3072)).T / 256.0
                 Y = np.array(Y).T
                 
                 P = self.EvaluateClassifier(X,self.W,self.b)
                 grad_W, grad_b = self.ComputeGradients(X,Y,P,self.W,self.lambda_)
-                #gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
+                gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
                 
-                #D_gW = grad_W - gWt
-                #D_gb = grad_b - gbt
-                #print grad_b,gbt,D_gb
-                #E_gW = np.mean(np.abs(D_gW))/np.mean(np.abs(gWt))
-                #E_gb = np.mean(np.abs(D_gb))/np.mean(np.abs(gbt))
+                D_gW = grad_W - gWt
+                D_gb = grad_b - gbt
+                print grad_b,gbt,D_gb
+                E_gW = np.mean(np.abs(D_gW))/np.mean(np.abs(gWt))
+                E_gb = np.mean(np.abs(D_gb))/np.mean(np.abs(gbt))
                 
-                #print E_gW, E_gb
+                print E_gW, E_gb
                 
                 J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
-                #print "Cost = %f in batch %d" % (J,batch_index)
+                # print "Cost = %f in batch %d" % (J,batch_index)
                 
                 self.W += -self.learning_rate * grad_W
                 self.b += -self.learning_rate * grad_b
             acc = self.ComputeAccuracy(X_t,Y_t,self.W,self.b)
-            print("Accuracy = %f%% after epoch %d" % (acc*100,ep))
+            print("Accuracy = %f%% after epoch %d" % (acc*100,ep+1))
+
             
 class Cifar10DataReader():  
     def __init__(self,cifar_folder,onehot=True):  
@@ -237,6 +238,18 @@ if __name__=="__main__":
     dr=Cifar10DataReader(cifar_folder="cifar-10-batches-py/")  
     import matplotlib.pyplot as plt  
     c = Classifier(32*32*3,10,eta,lamda,epoch,reader=dr)
-    # training and testing
-    c.Train() 
+    c.Train()
+    fig = plt.figure()
+    ax = fig.add_subplot(221)
+    print c.W
+    ax.imshow(c.W)
+    plt.show()
+
+
+
+    # print c.W.shape
+    # c.W.imshow(RGB)
+    # trai\ng and testing
+    # c.Train()
+
 
