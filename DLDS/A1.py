@@ -3,13 +3,17 @@ import numpy as np
 import os  
 
 batch_size = 100
-eta = 0.01
-lamda = 0
-epoch = 10
+eta = 0.002
+lamda = 0.0
+epoch = 40
 
 
 SVM = 0
 CrossEntropy = 1
+
+def max(a,b):
+    return a if a > b else b
+
 
 class Classifier(object):
     """docstring for Classifier"""
@@ -52,6 +56,7 @@ class Classifier(object):
                 P = p
             else:
                 P = np.hstack([P,p])
+            #print "shapeP=",P.shape
         #print P.shape
         return P
     
@@ -61,7 +66,7 @@ class Classifier(object):
         #print P[0].shape
         L = np.hstack([np.dot(np.reshape(Y[:,i],(1,self.out_size)),np.reshape(P[:,i],(self.out_size,1))) for i in xrange(n)])
         #print "L = ", L
-        J = np.sum(L) + lambda_ * np.sum(np.square(W))
+        J = np.sum(L) / float(n) + lambda_ * np.sum(np.square(W))
         return J
     
     def ComputeAccuracy(self, X, Y, W, b):
@@ -79,6 +84,7 @@ class Classifier(object):
         
     def ComputeGradients(self, X, Y, P, W, lambda_):
         n = X.shape[1]
+        #print n
         #print X.shape, Y.shape
         grad_W = np.zeros((self.out_size,self.in_size))
         grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
@@ -86,12 +92,17 @@ class Classifier(object):
         grad_b = np.reshape(grad_b, (self.out_size,1))
         
         for i in xrange(n):
+            #print "Y,P =", Y[:,i],P[:,i]
+            #print np.sum(P[:,i])
             g = -(np.reshape(Y[:,i],(self.out_size,1)) - np.reshape(P[:,i],(self.out_size,1)))
+            
+            #print "g=", g, "\n", np.sum(g)
+            
             #print g.shape, grad_b.shape
             grad_b += g
             grad_W += np.dot(g,np.reshape(X[:,i],(1,self.in_size)))
-        grad_W /= n
-        grad_b /= n
+        grad_W /= float(n)
+        grad_b /= float(n)
         grad_W += 2 * lambda_ * W
         #print grad_b
         return grad_W, grad_b
@@ -107,18 +118,20 @@ class Classifier(object):
             b_try = self.b.copy()
             b_try[i] += h
             c2 = self.ComputeCost(X,Y,W,b_try,lamda)
-            grad_b[i] = (c2-c) / h
+            grad_b[i] = (c2-c) / float(h)
             
         numel = self.in_size*self.out_size
         for i in xrange(numel):
             W_try = self.W.copy()
             r = i // self.in_size
+            #print "r=%d"%r
             c = i % self.in_size
+            #print "c=%d"%c
             W_try[r][c] += h
             c2 = self.ComputeCost(X, Y, W_try, b, lamda)
             
-            grad_W[r][c] = (c2-c) / h
-        
+            grad_W[r][c] = (c2-c) / float(h)
+        #print "grad_b_t=\n", grad_b, "\n"
         return grad_W, grad_b
         
     def Train(self, loss_type = CrossEntropy):
@@ -138,21 +151,28 @@ class Classifier(object):
                 X, Y = self.reader.next_train_data(self.batch_size)
                 X = np.array(X) 
                 X = np.reshape(X,(self.batch_size,3072)).T / 256.0
+                #print np.max(X), np.min(X)
                 Y = np.array(Y).T
                 
                 P = self.EvaluateClassifier(X,self.W,self.b)
                 grad_W, grad_b = self.ComputeGradients(X,Y,P,self.W,self.lambda_)
-                gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
+                #print "grad_b=\n", grad_b, "\n"
                 
-                D_gW = grad_W - gWt
-                D_gb = grad_b - gbt
-                print grad_b,gbt,D_gb
-                E_gW = np.mean(np.abs(D_gW))/np.mean(np.abs(gWt))
-                E_gb = np.mean(np.abs(D_gb))/np.mean(np.abs(gbt))
+                #print "Computing validating gradients...\n"
+                #gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
                 
-                print E_gW, E_gb
+                #D_gW = grad_W - gWt
+                #D_gb = grad_b - gbt
+                #print grad_b,gbt,D_gb
+                #print "D_gb = \n", D_gb
                 
-                J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
+                #E_gW = np.mean(np.abs(D_gW)/(np.abs(gWt)+np.abs(grad_W)))
+                
+                #E_gb = np.mean(np.abs(D_gb)/(np.abs(gbt)+np.abs(grad_b)))
+#
+                #print "Relative difference of E_gW, E_gb = ", E_gW, E_gb, "\n"
+                
+                #J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
                 # print "Cost = %f in batch %d" % (J,batch_index)
                 
                 self.W += -self.learning_rate * grad_W
@@ -239,6 +259,7 @@ if __name__=="__main__":
     import matplotlib.pyplot as plt  
     c = Classifier(32*32*3,10,eta,lamda,epoch,reader=dr)
     c.Train()
+    
     fig = plt.figure()
     ax = fig.add_subplot(221)
     print c.W
@@ -251,5 +272,6 @@ if __name__=="__main__":
     # c.W.imshow(RGB)
     # trai\ng and testing
     # c.Train()
+
 
 
