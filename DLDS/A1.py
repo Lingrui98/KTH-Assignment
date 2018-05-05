@@ -1,11 +1,12 @@
 import cPickle  
 import numpy as np  
 import os  
+import copy
 
 batch_size = 100
 eta = 0.01
-lamda = 0
-epoch = 10
+lamda = 0.001
+epoch = 40
 
 
 CHECK = False
@@ -13,9 +14,12 @@ CHECK = False
 SVM = 0
 CrossEntropy = 1
 
+def max(a,b):
+    return a if a > b else b
+
 class Classifier(object):
     """docstring for Classifier"""
-    def __init__(self, in_size, out_size, eta=0.1, lamda=0.1, epoch=100, batch_size=batch_size, reader=None):
+    def __init__(self, in_size, out_size, eta=0.1, lamda=0, epoch=100, batch_size=batch_size, reader=None):
         super(Classifier, self).__init__()
         self.out_size = out_size
         self.in_size = in_size
@@ -60,10 +64,14 @@ class Classifier(object):
     def ComputeCost(self, X, Y, W, b, lambda_):
         n = X.shape[1]
         P = self.EvaluateClassifier(X, W, b)
-        #print P[0].shape
-        L = np.hstack([np.dot(np.reshape(Y[:,i],(1,self.out_size)),np.reshape(P[:,i],(self.out_size,1))) for i in xrange(n)])
-        #print "L = ", L
-        J = np.sum(L) + lambda_ * np.sum(np.square(W))
+        # print P[0].shape
+        L = 0.0
+        for i in xrange(n):
+            L += -np.log(np.dot(np.reshape(Y[:,i],(1,self.out_size)),np.reshape(P[:,i],(self.out_size,1))))[0][0]
+        # print "L = ", L[0][0]
+        J = L / float(n) + lambda_ * np.sum(np.square(W))
+
+        # print "cost=%f" % J
         return J
     
     def ComputeAccuracy(self, X, Y, W, b):
@@ -104,54 +112,117 @@ class Classifier(object):
         grad_b = np.zeros(self.out_size)
         grad_b = np.reshape(grad_b, (self.out_size,1))
         
-        c = self.ComputeCost(X,Y,W,b,lamda)
+        c = self.ComputeCost(X, Y, W, b, lamda)
+        
+        # print "c = %f" % c
+
         for i in xrange(self.out_size):
-            b_try = self.b.copy()
+            b_try = copy.deepcopy(b)
             b_try[i] += h
             c2 = self.ComputeCost(X,Y,W,b_try,lamda)
             grad_b[i] = (c2-c) / h
+            # if i == self.out_size-1:
+            #     print "c2 = %f" % c2
             
-        numel = self.in_size*self.out_size
+        numel = self.in_size * self.out_size
         for i in xrange(numel):
-            W_try = self.W.copy()
+            W_try = copy.deepcopy(W)
             r = i // self.in_size
             c = i % self.in_size
+            # if i == numel-1:
+            #     print "c2 = %f" % c2
+
+            # print "(r,c)=(%d,%d)\n" % (r,c)
+
             W_try[r][c] += h
             c2 = self.ComputeCost(X, Y, W_try, b, lamda)
             
             grad_W[r][c] = (c2-c) / h
         
         return grad_W, grad_b
+
+
+    def ComputeGradsNumSlow(self, X, Y, W, b, lamda, h):
+
+        grad_W = np.zeros((self.out_size,self.in_size))
+        grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
+        grad_b = np.zeros(self.out_size)
+        grad_b = np.reshape(grad_b, (self.out_size,1))
+        
+        for i in xrange(self.out_size):
+            b_try = copy.deepcopy(b)
+            b_try[i] -= h
+            
+            # print b_try, b
+
+            c1 = self.ComputeCost(X, Y, W, b_try, lamda)
+
+            b_try = copy.deepcopy(b)
+            b_try[i] += h
+            c2 = self.ComputeCost(X, Y, W, b_try, lamda)
+
+            grad_b[i] = (c2-c1) / (2*h)
+
+            print "grad_b[%d]=%f" % (i, grad_b[i])
+
+        numel = self.in_size * self.out_size
+
+        for i in xrange(numel):  
+            r = i // self.in_size
+            c = i % self.in_size
+
+            W_try = copy.deepcopy(W)
+            W_try[r][c] -= h
+            c1 = self.ComputeCost(X, Y, W_try, b, lamda)
+
+            W_try = copy.deepcopy(W)
+            W_try[r][c] += h
+            c2 = self.ComputeCost(X, Y, W_try, b, lamda)
+
+            grad_W[r][c] = (c2-c1) / (2*h)
+
+        return grad_W, grad_b
+
+
+
+
         
     def Train(self, loss_type = CrossEntropy):
         ep = 0
         
         X_t, Y_t = self.reader.next_test_data()
-        #print np.array(X_t)[0]
+        
+        # Permuting
         X_t = np.reshape(np.array(X_t) / 256.0, (10000,3072)).T
-        #print X_t.shape
-        #print X_t[5]
-        #return
         Y_t = np.array(Y_t).T        
+
         for ep in xrange(self.max_epoch):
             print "Epoch %d, " % (ep+1)
             batch_index = 0
             for batch_index in xrange(50000//self.batch_size):
                 X, Y = self.reader.next_train_data(self.batch_size)
                 X = np.array(X) 
-                X = np.reshape(X,(self.batch_size,3072)).T / 256.0
+                X = np.reshape(X,(self.batch_size,3072)).T / 256.0 #normaliztion
                 Y = np.array(Y).T
                 
                 P = self.EvaluateClassifier(X,self.W,self.b)
+
                 grad_W, grad_b = self.ComputeGradients(X,Y,P,self.W,self.lambda_)
+
+
+                # The evaluation part for the gradients
                 if (CHECK==True):
-                    gWt, gbt = self.ComputeGradsNum(X,Y,self.W,self.b,self.lambda_,1e-6)
+                    print self.b
+                    gWt, gbt = self.ComputeGradsNumSlow(X,Y,self.W,self.b,self.lambda_,1e-8)
                     
                     D_gW = grad_W - gWt
                     D_gb = grad_b - gbt
-                    print grad_b,gbt,D_gb
-                    E_gW = np.mean(np.abs(D_gW))/np.mean(np.abs(gWt))
-                    E_gb = np.mean(np.abs(D_gb))/np.mean(np.abs(gbt))
+
+                    # print grad_b, "\n", gbt, "\n", "D=\n", D_gb
+                    eps = 1e-3
+
+                    E_gW = np.mean(np.abs(D_gW)) / max(eps, np.mean(np.abs(grad_W)+np.abs(gWt)))
+                    E_gb = np.mean(np.abs(D_gb)) / max(eps, np.mean(np.abs(grad_b)+np.abs(gbt)))
                     
                     print E_gW, E_gb
                 
@@ -160,6 +231,7 @@ class Classifier(object):
                 
                 self.W += -self.learning_rate * grad_W
                 self.b += -self.learning_rate * grad_b
+                # print "self.b = \n", self.b
             acc = self.ComputeAccuracy(X_t,Y_t,self.W,self.b)
             print("Accuracy = %f%% after epoch %d" % (acc*100,ep+1))
 
@@ -239,34 +311,26 @@ class Cifar10DataReader():
         return self._decode(datum,self.onehot)  
         
 if __name__=="__main__":  
+    # Initializing the reader
     dr=Cifar10DataReader(cifar_folder="cifar-10-batches-py/")  
+    
     import matplotlib.pyplot as plt  
+    
+    # Initializing classifier
     c = Classifier(32*32*3,10,eta,lamda,epoch,reader=dr)
     c.Train()
 
+    # Showing the weight matrix
     s_im = []
     for i in xrange(10):
         im = np.reshape(c.W[i,:],(32,32,3))
         s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
         # plt.imshow(s_im[i])
 
-
     fig = plt.figure()
     for i in xrange(10):
         ax = fig.add_subplot(2,5,i+1)
         ax.imshow(s_im[i])
-
-    
-    # print c.W
-    # print s_im.shape
     
     plt.show()
-
-
-
-    # print c.W.shape
-    # c.W.imshow(RGB)
-    # trai\ng and testing
-    # c.Train()
-
 
