@@ -2,11 +2,13 @@ import cPickle
 import numpy as np  
 import os  
 import copy
+import matplotlib.pyplot as plt  
+    
 
 batch_size = 100
-eta = 0.03
+eta = 0.1
 lamda = 0.0001
-epoch = 10
+epoch = 5
 
 m_nodes = 50
 rho = 0.99
@@ -18,6 +20,20 @@ CrossEntropy = 1
 
 def max(a,b):
     return a if a > b else b
+    
+def plot(a,b,c):
+    ep = []
+    for i in xrange(len(a)):
+        ep.append(i+1)
+    
+    l1 = plt.plot(ep,a,'r--',label='train')
+    l2 = plt.plot(ep,b,'g--',label='validate')
+    l3 = plt.plot(ep,c,'b--',label='test')
+    plt.title('The training process')
+    plt.xlabel('Epochs')
+    plt.ylabel('Percentage')
+    plt.legend(loc='upper left')
+    plt.show()
 
 class Classifier(object):
     """docstring for Classifier"""
@@ -220,25 +236,24 @@ class Classifier(object):
       
         X_train, Y_train = self.reader.next_train_data(10000)
         Y_train = np.array(Y_train).T  
-        X_train = np.reshape(np.array(X_train),(10000,3072)).T / 256.0 #normaliztion
-        
+        X_train = np.reshape(np.array(X_train),(10000,3072)).T / 256.0 #normaliztion   
         for i in xrange(3072):
             X_mean[i] = np.mean(X_train[i])
-        
         X_train = X_train - X_mean
 
         X_val, Y_val = self.reader.next_train_data(10000)
         Y_val = np.array(Y_val).T
         X_val = np.reshape(np.array(X_val),(10000,3072)).T / 256.0 #normaliztion
-        
         X_val = X_val - X_mean
         
         X_test, Y_test = self.reader.next_test_data()
         Y_test = np.array(Y_test).T
         X_test = np.reshape(np.array(X_test) , (10000,3072)).T / 256.0
-        
         X_test = X_test - X_mean
 
+        train = []
+        validate = []
+        test = []
 
         for ep in xrange(self.max_epoch):
             #print "Epoch %d, " % (ep+1)
@@ -292,9 +307,16 @@ class Classifier(object):
             tr_acc = self.ComputeAccuracy(X_train,Y_train,self.W1,self.b1,self.W2,self.b2)
             v_acc = self.ComputeAccuracy(X_val,Y_val,self.W1,self.b1,self.W2,self.b2)
             t_acc = self.ComputeAccuracy(X_test,Y_test,self.W1,self.b1,self.W2,self.b2)
+            
+            train.append(tr_acc*100)
+            validate.append(v_acc*100)
+            test.append(t_acc*100)
+            
             print("Epcoh %2d, train acc= %4.2f%%, validate acc = %4.2f%%, test acc = %4.2f%%" % (ep+1, tr_acc*100, v_acc*100, t_acc*100))
         t_acc = self.ComputeAccuracy(X_test,Y_test,self.W1,self.b1,self.W2,self.b2)
         print "Final accuracy on test set = %4.2f%%" % (t_acc*100)
+        
+        return train, validate, test
 
             
 class Cifar10DataReader():  
@@ -375,25 +397,13 @@ if __name__=="__main__":
     # Initializing the reader
     dr=Cifar10DataReader(cifar_folder="cifar-10-batches-py/")  
     
-    import matplotlib.pyplot as plt  
-    
+
     # Initializing classifier
     c = Classifier(32*32*3,10,m_nodes,rho,eta,lamda,epoch,reader=dr)
-    c.Train()
-
-    # Showing the weight matrix
-    s_im = []
-    for i in xrange(m_nodes):
-        im = np.reshape(c.W1[i,:],(32,32,3))
-        s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
-        # plt.imshow(s_im[i])
-
-    fig = plt.figure()
-    for i in xrange(m_nodes):
-        ax = fig.add_subplot(5,10,i+1)
-        ax.imshow(s_im[i])
     
-    plt.show()
+    tr, val, t = c.Train()
+
+    plot(tr,val,t)
 
 
 
