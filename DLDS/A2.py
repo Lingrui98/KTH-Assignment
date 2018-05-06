@@ -24,9 +24,9 @@ class Classifier(object):
         super(Classifier, self).__init__()
         self.out_size = out_size
         self.in_size = in_size
-        self.m_nodes = m_nodes
+        self.m_nodes = m_nodes # number of hidden nodes
         self.learning_rate = eta
-        self.lambda_=lamda
+        self.lambda_= lamda
         self.max_epoch = epoch
         self.W1 = np.random.normal(0,0.0001, (m_nodes,in_size))
         self.W2 = np.random.normal(0,0.0001, (out_size,m_nodes))
@@ -97,26 +97,50 @@ class Classifier(object):
         acc = num / float(n)
         return acc
         
-    def ComputeGradients(self, X, Y, P, W, lambda_):
+    def ComputeGradients(self, X, Y, P, W1, b1, W2, lambda_):
         n = X.shape[1]
         #print X.shape, Y.shape
-        grad_W = np.zeros((self.out_size,self.in_size))
-        grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
-        grad_b = np.zeros(self.out_size)
-        grad_b = np.reshape(grad_b, (self.out_size,1))
+        grad_W1 = np.zeros((self.m_nodes,self.in_size))
+        grad_W1 = np.reshape(grad_W1, (self.m_nodes,self.in_size))
+        grad_b1 = np.zeros(self.m_nodes)
+        grad_b1 = np.reshape(grad_b1, (self.m_nodes,1))
+        grad_W2 = np.zeros((self.out_size,self.m_nodes))
+        grad_W2 = np.reshape(grad_W2, (self.out_size,self.m_nodes))
+        grad_b2 = np.zeros(self.out_size)
+        grad_b2 = np.reshape(grad_b2, (self.out_size,1))
         
         for i in xrange(n):
+            s1 = np.dot(W1,np.reshape(X[:,i],(self.in_size,1))) + b1
+            h = np.abs((np.abs(s1)+s1) / 2) # max(0,s1)
+            
+            diag = np.zeros((self.m_nodes,self.m_nodes))
+            diag = np.reshape(diag, (self.m_nodes,self.m_nodes))
+            
+            for j in xrange(self.m_nodes):
+                if s1[j] > 0:
+                    diag[j][j] = 1
+            
             g = -(np.reshape(Y[:,i],(self.out_size,1)) - np.reshape(P[:,i],(self.out_size,1)))
             #print g.shape, grad_b.shape
-            grad_b += g
-            grad_W += np.dot(g,np.reshape(X[:,i],(1,self.in_size)))
-        grad_W /= n
-        grad_b /= n
-        grad_W += 2 * lambda_ * W
+            grad_b2 += g
+            grad_W2 += np.dot(g,np.reshape(h,(1,self.m_nodes)))
+            
+            g = np.dot(g.T, W2)
+            g = np.dot(g, diag).T
+            
+            grad_b1 += g
+            grad_W1 += np.dot(g,np.reshape(X[:,i],(1,self.in_size)))
+            
+        grad_W1 /= n
+        grad_b1 /= n
+        grad_W2 /= n
+        grad_b2 /= n
+        grad_W1 += 2 * lambda_ * W1
+        grad_W2 += 2 * lambda_ * W2
         #print grad_b
-        return grad_W, grad_b
+        return grad_W1, grad_b1, grad_W2, grad_b2
         
-    def ComputeGradsNum(self, X, Y, W, b, lamda, h):
+    def ComputeGradsNum(self, X, Y, W1, b1, W2, b2, lamda, h):
         grad_W = np.zeros((self.out_size,self.in_size))
         grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
         grad_b = np.zeros(self.out_size)
@@ -144,7 +168,7 @@ class Classifier(object):
         return grad_W, grad_b
 
 
-    def ComputeGradsNumSlow(self, X, Y, W, b, lamda, h):
+    def ComputeGradsNumSlow(self, X, Y, W1, b1, W2, b2, lamda, h):
 
         grad_W = np.zeros((self.out_size,self.in_size))
         grad_W = np.reshape(grad_W, (self.out_size,self.in_size))
@@ -205,9 +229,9 @@ class Classifier(object):
                 X = np.reshape(X,(self.batch_size,3072)).T / 256.0 #normaliztion
                 Y = np.array(Y).T
                 
-                P = self.EvaluateClassifier(X,self.W,self.b)
+                P = self.EvaluateClassifier(X, self.W1, self.b1, self.W2, self.b2)
 
-                grad_W, grad_b = self.ComputeGradients(X,Y,P,self.W,self.lambda_)
+                grad_W1, grad_b1, grad_W2, grad_b2 = self.ComputeGradients(X, Y, P, self.W1, self.b1, self.W2, self.lambda_)
 
 
                 # The evaluation part for the gradients
@@ -226,13 +250,15 @@ class Classifier(object):
                     
                     print E_gW, E_gb
                 
-                J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
+                J = self.ComputeCost(X,Y,self.W1,self.b1,self.W2,self.b2,self.lambda_)
                 # print "Cost = %f in batch %d" % (J,batch_index)
                 
-                self.W += -self.learning_rate * grad_W
-                self.b += -self.learning_rate * grad_b
+                self.W1 += -self.learning_rate * grad_W1
+                self.b1 += -self.learning_rate * grad_b1
+                self.W2 += -self.learning_rate * grad_W2
+                self.b2 += -self.learning_rate * grad_b2
                 # print "self.b = \n", self.b
-            acc = self.ComputeAccuracy(X_t,Y_t,self.W,self.b)
+            acc = self.ComputeAccuracy(X_t,Y_t,self.W1,self.b1,self.W2,self.b2)
             print("Accuracy = %f%% after epoch %d" % (acc*100,ep+1))
 
             
@@ -323,14 +349,18 @@ if __name__=="__main__":
     # Showing the weight matrix
     s_im = []
     for i in xrange(10):
-        im = np.reshape(c.W[i,:],(32,32,3))
+        im = np.reshape(c.W1[i,:],(32,32,3))
         s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
         # plt.imshow(s_im[i])
+    for i in xrange(10):
+        im = np.reshape(c.W2[i,:],(32,32,3))
+        s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
 
     fig = plt.figure()
     for i in xrange(10):
-        ax = fig.add_subplot(2,5,i+1)
+        ax = fig.add_subplot(4,5,i+1)
         ax.imshow(s_im[i])
     
     plt.show()
+
 
