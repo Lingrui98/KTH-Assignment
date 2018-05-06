@@ -4,11 +4,12 @@ import os
 import copy
 
 batch_size = 100
-eta = 0.01
-lamda = 0.00
-epoch = 40
+eta = 0.03
+lamda = 0.0001
+epoch = 10
 
-m_nodes = 5
+m_nodes = 50
+rho = 0.99
 
 CHECK = False
 
@@ -20,16 +21,17 @@ def max(a,b):
 
 class Classifier(object):
     """docstring for Classifier"""
-    def __init__(self, in_size, out_size, m_nodes, eta=0.1, lamda=0, epoch=100, batch_size=batch_size, reader=None):
+    def __init__(self, in_size, out_size, m_nodes, rho, eta=0.1, lamda=0, epoch=100, batch_size=batch_size, reader=None):
         super(Classifier, self).__init__()
         self.out_size = out_size
         self.in_size = in_size
         self.m_nodes = m_nodes # number of hidden nodes
+        self.rho = rho
         self.learning_rate = eta
         self.lambda_= lamda
         self.max_epoch = epoch
-        self.W1 = np.random.normal(0,0.0001, (m_nodes,in_size))
-        self.W2 = np.random.normal(0,0.0001, (out_size,m_nodes))
+        self.W1 = np.random.normal(0,0.001, (m_nodes,in_size))
+        self.W2 = np.random.normal(0,0.001, (out_size,m_nodes))
 
         self.b1 = np.array([0.0 for i in xrange(m_nodes)])
         self.b1 = np.reshape(self.b1, (m_nodes,1))
@@ -214,25 +216,43 @@ class Classifier(object):
     def Train(self, loss_type = CrossEntropy):
         ep = 0
         
-        X_t, Y_t = self.reader.next_test_data()
+        X_mean = np.reshape(np.zeros(3072), (3072,1))
+      
+        X_train, Y_train = self.reader.next_train_data(10000)
+        Y_train = np.array(Y_train).T  
+        X_train = np.reshape(np.array(X_train),(10000,3072)).T / 256.0 #normaliztion
         
-        # Permuting
-        X_t = np.reshape(np.array(X_t) / 256.0, (10000,3072)).T
-        Y_t = np.array(Y_t).T        
+        for i in xrange(3072):
+            X_mean[i] = np.mean(X_train[i])
+        
+        X_train = X_train - X_mean
+
+        X_val, Y_val = self.reader.next_train_data(10000)
+        Y_val = np.array(Y_val).T
+        X_val = np.reshape(np.array(X_val),(10000,3072)).T / 256.0 #normaliztion
+        
+        X_val = X_val - X_mean
+        
+        X_test, Y_test = self.reader.next_test_data()
+        Y_test = np.array(Y_test).T
+        X_test = np.reshape(np.array(X_test) , (10000,3072)).T / 256.0
+        
+        X_test = X_test - X_mean
+
 
         for ep in xrange(self.max_epoch):
-            print "Epoch %d, " % (ep+1)
+            #print "Epoch %d, " % (ep+1)
             batch_index = 0
-            for batch_index in xrange(50000//self.batch_size):
-                X, Y = self.reader.next_train_data(self.batch_size)
-                X = np.array(X) 
-                X = np.reshape(X,(self.batch_size,3072)).T / 256.0 #normaliztion
-                Y = np.array(Y).T
-                
+            
+            for batch_index in xrange(10000//self.batch_size):
+                X = np.reshape(X_train[:,batch_index*self.batch_size:(batch_index+1)*self.batch_size],(3072,self.batch_size))
+                #print X.shape
+                Y = Y_train[:,batch_index*self.batch_size:(batch_index+1)*self.batch_size]
+                #print Y.shape
                 P = self.EvaluateClassifier(X, self.W1, self.b1, self.W2, self.b2)
 
                 grad_W1, grad_b1, grad_W2, grad_b2 = self.ComputeGradients(X, Y, P, self.W1, self.b1, self.W2, self.lambda_)
-
+                
 
                 # The evaluation part for the gradients
                 # if (CHECK==True):
@@ -252,14 +272,29 @@ class Classifier(object):
                 
                 J = self.ComputeCost(X,Y,self.W1,self.b1,self.W2,self.b2,self.lambda_)
                 # print "Cost = %f in batch %d" % (J,batch_index)
-                
-                self.W1 += -self.learning_rate * grad_W1
-                self.b1 += -self.learning_rate * grad_b1
-                self.W2 += -self.learning_rate * grad_W2
-                self.b2 += -self.learning_rate * grad_b2
+                if batch_index==0:
+                    self.W1 += -self.learning_rate * grad_W1
+                    self.b1 += -self.learning_rate * grad_b1
+                    self.W2 += -self.learning_rate * grad_W2
+                    self.b2 += -self.learning_rate * grad_b2
+                else:
+                    self.W1 += -self.learning_rate * grad_W1 - self.rho * v[0]
+                    self.b1 += -self.learning_rate * grad_b1 - self.rho * v[1]
+                    self.W2 += -self.learning_rate * grad_W2 - self.rho * v[2]
+                    self.b2 += -self.learning_rate * grad_b2 - self.rho * v[3]
+                v = [self.learning_rate * grad_W1, 
+                     self.learning_rate * grad_b1, 
+                     self.learning_rate * grad_W2, 
+                     self.learning_rate * grad_b2]
+                #print grad[0].shape
+                    
                 # print "self.b = \n", self.b
-            acc = self.ComputeAccuracy(X_t,Y_t,self.W1,self.b1,self.W2,self.b2)
-            print("Accuracy = %f%% after epoch %d" % (acc*100,ep+1))
+            tr_acc = self.ComputeAccuracy(X_train,Y_train,self.W1,self.b1,self.W2,self.b2)
+            v_acc = self.ComputeAccuracy(X_val,Y_val,self.W1,self.b1,self.W2,self.b2)
+            t_acc = self.ComputeAccuracy(X_test,Y_test,self.W1,self.b1,self.W2,self.b2)
+            print("Epcoh %2d, train acc= %4.2f%%, validate acc = %4.2f%%, test acc = %4.2f%%" % (ep+1, tr_acc*100, v_acc*100, t_acc*100))
+        t_acc = self.ComputeAccuracy(X_test,Y_test,self.W1,self.b1,self.W2,self.b2)
+        print "Final accuracy on test set = %4.2f%%" % (t_acc*100)
 
             
 class Cifar10DataReader():  
@@ -343,24 +378,22 @@ if __name__=="__main__":
     import matplotlib.pyplot as plt  
     
     # Initializing classifier
-    c = Classifier(32*32*3,10,m_nodes,eta,lamda,epoch,reader=dr)
+    c = Classifier(32*32*3,10,m_nodes,rho,eta,lamda,epoch,reader=dr)
     c.Train()
 
     # Showing the weight matrix
     s_im = []
-    for i in xrange(10):
+    for i in xrange(m_nodes):
         im = np.reshape(c.W1[i,:],(32,32,3))
         s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
         # plt.imshow(s_im[i])
-    for i in xrange(10):
-        im = np.reshape(c.W2[i,:],(32,32,3))
-        s_im.append((im - np.min(im)) / (np.max(im) - np.min(im)))
 
     fig = plt.figure()
-    for i in xrange(10):
-        ax = fig.add_subplot(4,5,i+1)
+    for i in xrange(m_nodes):
+        ax = fig.add_subplot(5,10,i+1)
         ax.imshow(s_im[i])
     
     plt.show()
+
 
 
