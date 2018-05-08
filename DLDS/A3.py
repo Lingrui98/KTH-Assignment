@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 
 batch_size = 100
-eta = 0.05
+eta = 0.1
 lamda = 0.005
 epoch = 60
 
@@ -54,7 +54,7 @@ class Classifier(object):
 
         W = []
         for i in xrange(n_layers):
-            W.append(np.random.normal(0,0.001, (m_nodes[i+1],m_nodes[i])))
+            W.append(np.random.normal(0,0.01, (m_nodes[i+1],m_nodes[i])))
 
         self.W = W
 
@@ -80,20 +80,19 @@ class Classifier(object):
         P = np.zeros((self.out_size,n))
         P = np.reshape(P,(self.out_size,n))
 
-
-
         for i in xrange(n):
             s = [np.reshape(X[:,i],(self.in_size,1))]
             h = [s[0]]
             for j in xrange(self.n_layers):
                 s.append(np.dot(W[j],h[j]) + b[j])
                 h.append(np.abs((np.abs(s[j+1])+s[j+1]) / 2)) # max(0,s)
-
+            # print s[self.n_layers]
             p = self.softmax(s[self.n_layers])
             if i == 0:
                 P = p
             else:
                 P = np.hstack([P,p])
+        # print P.shape
         return P
 
     def ComputeCost(self, X, Y, W, b, lambda_):
@@ -104,7 +103,7 @@ class Classifier(object):
             L += -np.log(np.dot(np.reshape(Y[:,i],(1,self.out_size)),np.reshape(P[:,i],(self.out_size,1))))[0][0]
         J = L / float(n)
         R = 0.0
-        for i in xrange(self.n_layers):
+        for i in xrange(self. n_layers):
             R += np.sum(np.square(W[i]))
         J += lambda_ * R
         return J
@@ -139,13 +138,14 @@ class Classifier(object):
                 s.append(np.dot(W[j],h[j]) + b[j])
                 h.append(np.abs((np.abs(s[j+1])+s[j+1]) / 2)) # max(0,s1)
 
+                if j < self.n_layers-1:
+                    diag.append(np.reshape(np.zeros((self.m_nodes[j+1],self.m_nodes[j+1])), (self.m_nodes[j+1],self.m_nodes[j+1])))
+                # print diag
+                    for k in xrange(self.m_nodes[j+1]):
+                        if s[j+1][k] > 0:
+                            (diag[j+1])[k][k] = 1
 
-                diag.append(np.reshape(np.zeros((self.m_nodes[j+1],self.m_nodes[j+1])), (self.m_nodes[j+1],self.m_nodes[j+1])))
-
-                for k in xrange(self.m_nodes[j+1]):
-                    if s[j+1][k] > 0:
-                        (diag[j+1])[k][k] = 1
-
+            # print diag
             g = -(np.reshape(Y[:,i],(self.out_size,1)) - np.reshape(P[:,i],(self.out_size,1)))
 
             for j in xrange(self.n_layers):
@@ -162,20 +162,13 @@ class Classifier(object):
                     g = np.dot(g, diag[k-1]).T
                     # print g.shape
 
-            # grad_b2 += g
-            # grad_W2 += np.dot(g,np.reshape(h,(1,self.m_nodes)))
-            #
-            # g = np.dot(g.T, W[2])
-            # g = np.dot(g, diag).T
-            #
-            # grad_b1 += g
-            # grad_W1 += np.dot(g,np.reshape(X[:,i],(1,self.in_size)))
 
         for i in xrange(n_layers):
             grad_W[i] /= float(n)
             grad_W[i] += 2 * lambda_ * W[i]
             grad_b[i] /= float(n)
 
+        # print len(grad_W)
         # print grad_b
         # print grad_W
         return grad_W, grad_b
@@ -309,7 +302,7 @@ class Classifier(object):
                 #     print E_gW, E_gb
 
                 J = self.ComputeCost(X,Y,self.W,self.b,self.lambda_)
-                print "Cost = %f in batch %d" % (J,batch_index)
+                # print "Cost = %f in batch %d" % (J,batch_index)
                 if batch_index==0:
                     for i in xrange(self.n_layers):
                         self.W[i] += -self.learning_rate * grad_W[i]
@@ -322,9 +315,11 @@ class Classifier(object):
                 for i in xrange(self.n_layers):
                     v.append(self.learning_rate * grad_W[i])
                     v.append(self.learning_rate * grad_b[i])
+                # print v
                 #print grad[0].shape
 
                 # print "self.b = \n", self.b
+                # print self.W,self.b
             tr_acc = self.ComputeAccuracy(X_train,Y_train,self.W,self.b)
             v_acc = self.ComputeAccuracy(X_val,Y_val,self.W,self.b)
             t_acc = self.ComputeAccuracy(X_test,Y_test,self.W,self.b)
@@ -333,7 +328,7 @@ class Classifier(object):
             validate.append(v_acc*100)
             test.append(t_acc*100)
 
-            print("Epcoh %2d, train acc= %4.2f%%, validate acc = %4.2f%%, test acc = %4.2f%%" % (ep+1, tr_acc*100, v_acc*100, t_acc*100))
+            print("Epoch %2d, train acc= %4.2f%%, validate acc = %4.2f%%, test acc = %4.2f%%" % (ep+1, tr_acc*100, v_acc*100, t_acc*100))
         t_acc = self.ComputeAccuracy(X_test,Y_test,self.W,self.b)
         print "Final accuracy on test set = %4.2f%%" % (t_acc*100)
 
