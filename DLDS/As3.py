@@ -4,7 +4,7 @@ import os
 import copy
 import matplotlib.pyplot as plt
 
-BN = True
+BN = False
 
 batch_size = 1
 eta = 0.01
@@ -15,11 +15,11 @@ epoch = 10
 initialization = 'Xavier'
 # initialization = 0
 
-n_layers =2
+n_layers = 3
 
 out_size = 10
 in_size = 3072
-m_nodes = [in_size,50,out_size]
+m_nodes = [in_size,50,30,out_size]
 rho = 0
 
 CHECK = True
@@ -278,7 +278,15 @@ class Classifier(object):
 
         return grad_W, grad_b
 
-
+    def print_pram(self):
+        s = 'with' if self.BN == True else 'without'
+        print "\nTraining a %d-layer network %s batch normalization" % (self.n_layers,s)
+        print "The structure is ", self.m_nodes
+        print "initial eta set to %3.2f" % (self.learning_rate)
+        print "lambda set to %3.2f" % (self.lambda_)
+        print "max_epoch set to %d" % (self.max_epoch)
+        print "rho set to %3.2f" % (self.rho)
+        print "alpha set to %3.2f\n" % (self.alpha)
 
 
     def Train(self, loss_type = CrossEntropy):
@@ -309,6 +317,7 @@ class Classifier(object):
         cost = []
 
         print "Data loaded, training starts..."
+        self.print_pram()
 
         for ep in xrange(self.max_epoch):
             #print "Epoch %d, " % (ep+1)
@@ -327,6 +336,7 @@ class Classifier(object):
 
                 # The evaluation part for the gradients
                 if (CHECK==True):
+                    print "Checking gradients..."
                     # print self.b
                     # gWt, gbt = self.ComputeGradsNumSlow(X,Y,self.W,self.b,self.lambda_,1e-5)
 
