@@ -13,7 +13,7 @@ gamma = 0.9
 hid_m = 100
 seq_length = 25
 
-MAX_EPOCH = 1
+MAX_EPOCH = 10
 CHECK = False
 
 def plot_loss(l):
