@@ -59,7 +59,7 @@ def plot_cost(tr,val):
 
 class Classifier(object):
     """docstring for Classifier"""
-    def __init__(self, n_layers, m_nodes, init, rho, BN, eta=0.1, lamda=0, epoch=20, batch_size=batch_size, reader=None):
+    def __init__(self, n_layers, m_nodes, init, rho, BN, eta=0.1, lamda=0, epoch=20, batch_size=batch_size):
         super(Classifier, self).__init__()
         self.out_size = m_nodes[-1]
         self.in_size = m_nodes[0]
@@ -509,10 +509,10 @@ if __name__=="__main__":
     print best_arr
 
     for i in xrange(5):
-        lr = 0.1 / float((i+1)*(i+1)) 
+        lr = 0.02 + 0.002 * i
         for j in xrange(5):
-            ld = j*0.002 # [0,0.01]
-            a = Classifier(n_layers,m_nodes,initialization,rho,BN,lr,ld,epoch,reader=dr)
+            ld = 0.003 + 0.0005 * j # [0,0.01]
+            a = Classifier(n_layers,m_nodes,initialization,rho,BN,lr,ld,epoch)
             tr, val, t, cost, best = a.Train()
             if best[0] > best_arr[0][1]:
                 # print best_arr
