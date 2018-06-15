@@ -1,0 +1,24 @@
+read: ../cifar-10-batches-py/test_batch
+Epoch  1, train acc= 32.91%, validate acc = 30.90%, test acc = 33.08%
+Epoch  2, train acc= 36.70%, validate acc = 34.60%, test acc = 36.78%
+Epoch  3, train acc= 38.63%, validate acc = 36.70%, test acc = 38.60%
+Epoch  4, train acc= 39.86%, validate acc = 36.90%, test acc = 39.36%
+Epoch  5, train acc= 40.72%, validate acc = 37.30%, test acc = 40.33%
+Epoch  6, train acc= 41.49%, validate acc = 37.60%, test acc = 41.34%
+Epoch  7, train acc= 42.36%, validate acc = 39.40%, test acc = 42.13%
+Epoch  8, train acc= 42.88%, validate acc = 39.40%, test acc = 42.62%
+Epoch  9, train acc= 43.33%, validate acc = 39.80%, test acc = 42.86%
+Epoch 10, train acc= 43.83%, validate acc = 39.70%, test acc = 43.20%
+
+
+read: ../cifar-10-batches-py/test_batch
+Epoch  1, train acc= 28.99%, validate acc = 31.20%, test acc = 29.20%
+Epoch  2, train acc= 33.82%, validate acc = 35.70%, test acc = 33.96%
+Epoch  3, train acc= 36.08%, validate acc = 38.80%, test acc = 35.97%
+Epoch  4, train acc= 37.43%, validate acc = 40.20%, test acc = 37.39%
+Epoch  5, train acc= 38.41%, validate acc = 40.10%, test acc = 38.17%
+Epoch  6, train acc= 39.11%, validate acc = 40.90%, test acc = 39.00%
+Epoch  7, train acc= 39.81%, validate acc = 41.90%, test acc = 39.81%
+Epoch  8, train acc= 40.34%, validate acc = 42.60%, test acc = 40.30%
+Epoch  9, train acc= 40.87%, validate acc = 42.30%, test acc = 40.99%
+Epoch 10, train acc= 41.44%, validate acc = 42.90%, test acc = 41.44%
